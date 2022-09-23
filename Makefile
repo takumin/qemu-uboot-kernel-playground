@@ -1,46 +1,42 @@
+unexport CPATH
+unexport C_INCLUDE_PATH
+unexport CPLUS_INCLUDE_PATH
+unexport PKG_CONFIG_PATH
+unexport CMAKE_MODULE_PATH
+unexport CCACHE_PATH
+unexport LD_LIBRARY_PATH
+unexport LD_RUN_PATH
+unexport UNZIP
+
+export LC_ALL = C
+export CCACHE_DIR = $(HOME)/.cache/ccache
+
 BUILD_DIR      ?= /tmp/qemu-uboot-kernel-playground
 DOWNLOAD_DIR   ?= $(CURDIR)/.dl
 SOURCE_DIR     ?= $(CURDIR)/.src
 U_BOOT_VERSION ?= v2022.07
+LINUX_VERSION  ?= 5.15.69
 
 .PHONY: default
-default: u-boot
+default: u-boot linux
 
-.PHONY: u-boot
-u-boot:
-ifeq ($(wildcard $(DOWNLOAD_DIR)/$(U_BOOT_VERSION).tar.gz),)
-	@wget -P $(DOWNLOAD_DIR) https://github.com/u-boot/u-boot/archive/refs/tags/$(U_BOOT_VERSION).tar.gz
-endif
-ifeq ($(wildcard $(SOURCE_DIR)/u-boot/Makefile),)
-	@mkdir -p $(SOURCE_DIR)/u-boot
-	@tar -xvf $(DOWNLOAD_DIR)/$(U_BOOT_VERSION).tar.gz -C $(SOURCE_DIR)/u-boot --strip-components=1
-endif
-ifeq ($(wildcard $(BUILD_DIR)/u-boot/.config),)
-	@$(MAKE) \
-		-C $(SOURCE_DIR)/u-boot \
-		-j $(shell nproc) \
-		O=$(BUILD_DIR)/u-boot \
-		qemu-x86_64_defconfig
-	@sed -i -E 's@^CONFIG_DEFAULT_DEVICE_TREE=.*@CONFIG_DEFAULT_DEVICE_TREE="qemu-x86_q35"@' $(BUILD_DIR)/u-boot/.config
-endif
-ifeq ($(wildcard $(BUILD_DIR)/u-boot/u-boot.rom),)
-	@$(MAKE) \
-		-C $(SOURCE_DIR)/u-boot \
-		-j $(shell nproc) \
-		O=$(BUILD_DIR)/u-boot
-endif
+include Makefile.u-boot
+include Makefile.linux
 
-.PHONY: u-boot-menuconfig
-u-boot-menuconfig:
-	@$(MAKE) \
-		-C $(SOURCE_DIR)/u-boot \
-		-j $(shell nproc) \
-		O=$(BUILD_DIR)/u-boot \
-		menuconfig
+.PHONY: run-u-boot
+run-u-boot:
+	@qemu-system-x86_64 \
+		-M q35 \
+		-nographic \
+		-bios $(BUILD_DIR)/u-boot/u-boot.rom
 
-.PHONY: run
-run:
-	@qemu-system-x86_64 -M q35 -nographic -bios $(BUILD_DIR)/u-boot/u-boot.rom
+.PHONY: run-kernel
+run-kernel:
+	@qemu-system-x86_64 \
+		-M q35 \
+		-nographic \
+		-kernel $(BUILD_DIR)/linux/arch/x86/boot/bzImage \
+		-append "console=ttyS0"
 
 .PHONY: clean
 clean:

@@ -1,0 +1,39 @@
+.PHONY: linux
+linux:
+ifeq ($(wildcard $(DOWNLOAD_DIR)/linux-$(LINUX_VERSION).tar.xz),)
+	@wget -P $(DOWNLOAD_DIR) https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-$(LINUX_VERSION).tar.xz
+endif
+ifeq ($(wildcard $(SOURCE_DIR)/linux/Makefile),)
+	@mkdir -p $(SOURCE_DIR)/linux
+	@tar -xvf $(DOWNLOAD_DIR)/linux-$(LINUX_VERSION).tar.xz -C $(SOURCE_DIR)/linux --strip-components=1
+endif
+ifeq ($(wildcard $(BUILD_DIR)/linux/.config),)
+	@$(MAKE) \
+		-C $(SOURCE_DIR)/linux \
+		-j $(shell nproc) \
+		O=$(BUILD_DIR)/linux \
+		CC="ccache gcc" \
+		CXX="ccache g++" \
+		KBUILD_BUILD_TIMESTAMP='' \
+		x86_64_defconfig
+endif
+ifeq ($(wildcard $(BUILD_DIR)/linux/vmlinux),)
+	@$(MAKE) \
+		-C $(SOURCE_DIR)/linux \
+		-j $(shell nproc) \
+		O=$(BUILD_DIR)/linux \
+		CC="ccache gcc" \
+		CXX="ccache g++" \
+		KBUILD_BUILD_TIMESTAMP=''
+endif
+
+.PHONY: menuconfig-linux
+menuconfig-linux:
+	@$(MAKE) \
+		-C $(SOURCE_DIR)/linux \
+		-j $(shell nproc) \
+		O=$(BUILD_DIR)/linux \
+		CC="ccache gcc" \
+		CXX="ccache g++" \
+		KBUILD_BUILD_TIMESTAMP='' \
+		menuconfig
